@@ -27,7 +27,7 @@ byte prevNeighborModes[6];
 
 void setup() {
   // put your setup code here, to run once:
-  piece = PLAYER;
+  piece = BOSS;
 
   if (piece == GAMEMANAGER) {
     mode = HEAL;
@@ -67,7 +67,7 @@ void loop() {
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
       prevNeighborModes[f] = getLastValueReceivedOnFace(f);
-    }else{
+    } else {
       prevNeighborModes[f] = STANDBY;
     }
   }
@@ -79,10 +79,20 @@ void loop() {
 
 void bossMode() {
 
-  if (bossHealth > 6) {
-    bossHealth = 6;
-  }
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
+      if (getLastValueReceivedOnFace(f) == HEAL) {
+        if (prevNeighborModes[f] != HEAL) {
+          bossHealth += 1;
+        }
+      }
+    }
 
+    if (bossHealth > 6) {
+      bossHealth = 6;
+    }
+
+  }
 }
 
 void playerMode() {
