@@ -12,9 +12,23 @@ enum pieces {
 
 byte piece = BOSS;
 
+enum modes {
+  STANDBY,
+  ATTACK,
+  STOCKPILE,
+  HEAL
+};
+
+byte mode = STANDBY;
+
 void setup() {
   // put your setup code here, to run once:
-  piece = PLAYER;
+  piece = BOSS;
+
+  if (piece == GAMEMANAGER) {
+    mode = HEAL;
+  }
+
 }
 
 void loop() {
@@ -36,6 +50,10 @@ void loop() {
 
       break;
 
+    case GAMEMANAGER:
+
+      gameManagerMode();
+      gameManagerDisplay();
 
   }
 
@@ -46,9 +64,11 @@ void loop() {
 */
 
 void bossMode() {
+
   if (bossHealth > 6) {
     bossHealth = 6;
   }
+
 }
 
 void playerMode() {
@@ -61,6 +81,16 @@ void playerMode() {
     attack = 3;
   }
 
+}
+
+void gameManagerMode() {
+  if (buttonDoubleClicked()) {
+    if (mode == HEAL) {
+      mode = STOCKPILE;
+    } else if (mode == STOCKPILE) {
+      mode = HEAL;
+    }
+  }
 }
 
 /*
@@ -78,16 +108,26 @@ void bossDisplay() {
 void playerDisplay() {
   FOREACH_FACE(f) {
 
-   //PlayerHealth is displayed on the left side using faces 0-2
+    //PlayerHealth is displayed on the left side using faces 0-2
     if (f < playerHealth) {
       setFaceColor(f, GREEN);
     }
 
     //Attack value is displayed on right side using faces 3-5
-    if (f < attack){
-      setFaceColor(5-f, BLUE);
+    if (f < attack) {
+      setFaceColor(5 - f, BLUE);
     }
 
+  }
+}
+
+void gameManagerDisplay() {
+  if (mode == HEAL) {
+    setColor(GREEN);
+  }
+
+  if (mode == STOCKPILE) {
+    setColor(BLUE);
   }
 }
 
