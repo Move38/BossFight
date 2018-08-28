@@ -2,7 +2,7 @@
 byte bossHealth = 3;
 
 byte attack = 1;
-byte playerHealth = 3;
+byte playerHealth = 1;
 
 enum pieces {
   BOSS,
@@ -21,9 +21,13 @@ enum modes {
 
 byte mode = STANDBY;
 
+byte prevNeighborModes[6];
+
+//byte modeReceived = STANDBY;
+
 void setup() {
   // put your setup code here, to run once:
-  piece = BOSS;
+  piece = PLAYER;
 
   if (piece == GAMEMANAGER) {
     mode = HEAL;
@@ -54,9 +58,19 @@ void loop() {
 
       gameManagerMode();
       gameManagerDisplay();
+      break;
 
   }
 
+  setValueSentOnAllFaces(mode);
+
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
+      prevNeighborModes[f] = getLastValueReceivedOnFace(f);
+    }else{
+      prevNeighborModes[f] = STANDBY;
+    }
+  }
 }
 
 /*
@@ -73,6 +87,22 @@ void bossMode() {
 
 void playerMode() {
 
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
+      if (getLastValueReceivedOnFace(f) == HEAL) {
+        if (prevNeighborModes[f] != HEAL) {
+          playerHealth += 1;
+        }
+      }
+
+      if ( getLastValueReceivedOnFace(f) == STOCKPILE) {
+        if (prevNeighborModes[f] != STOCKPILE) {
+          attack += 1;
+        }
+      }
+    }
+  }
+
   if (playerHealth > 3) {
     playerHealth = 3;
   }
@@ -84,6 +114,8 @@ void playerMode() {
 }
 
 void gameManagerMode() {
+
+  //Switch between the heal and stockpile state
   if (buttonDoubleClicked()) {
     if (mode == HEAL) {
       mode = STOCKPILE;
@@ -91,6 +123,7 @@ void gameManagerMode() {
       mode = HEAL;
     }
   }
+
 }
 
 /*
