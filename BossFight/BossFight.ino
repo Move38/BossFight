@@ -16,7 +16,8 @@ enum modes {
   STANDBY,
   ATTACK,
   STOCKPILE,
-  HEAL
+  HEAL,
+  BOSSMODE
 };
 
 byte mode = STANDBY;
@@ -32,7 +33,11 @@ void setup() {
   Serial.begin();
 
   // put your setup code here, to run once:
-  piece = BOSS;
+  piece = PLAYER;
+
+  if (piece == BOSS){
+    mode = BOSSMODE;
+  }
 
   if (piece == PLAYER) {
     mode = ATTACK;
@@ -122,7 +127,7 @@ void bossMode() {
 
     if (bossHealth > 6) {
       bossHealth = 6;
-    } else if (bossHealth < 0) {
+    } else if (bossHealth < 1) {
       bossHealth = 0;
     }
 
@@ -143,6 +148,12 @@ void playerMode() {
       if ( getModeFromReceivedData(receivedData) == STOCKPILE) {
         if (prevNeighborModes[f] != STOCKPILE) {
           attack += 1;
+        }
+      }
+
+      if ( getModeFromReceivedData(receivedData) == BOSSMODE) {
+        if (prevNeighborModes[f] != BOSSMODE) {
+          attack = 1;
         }
       }
     }
@@ -185,8 +196,8 @@ void bossDisplay() {
 }
 
 void playerDisplay() {
+  setColor(OFF);
   FOREACH_FACE(f) {
-    setColor(OFF);
     //PlayerHealth is displayed on the left side using faces 0-2
     if (f < playerHealth) {
       setFaceColor(f, GREEN);
