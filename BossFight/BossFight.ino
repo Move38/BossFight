@@ -1,7 +1,7 @@
 
 byte bossHealth = 3;
 
-byte attack = 1;
+byte attack = 0;
 byte playerHealth = 1;
 
 enum pieces {
@@ -23,11 +23,21 @@ byte mode = STANDBY;
 
 byte prevNeighborModes[6];
 
-//byte modeReceived = STANDBY;
+#include "Serial.h"
+
+ServicePortSerial Serial;
 
 void setup() {
+
+  Serial.begin();
+
   // put your setup code here, to run once:
   piece = BOSS;
+
+  if (piece == PLAYER) {
+    mode = ATTACK;
+    attack = 1;
+  }
 
   if (piece == GAMEMANAGER) {
     mode = HEAL;
@@ -36,6 +46,8 @@ void setup() {
 }
 
 void loop() {
+
+  Serial.println(bossHealth);
   // put your main code here, to run repeatedly:
 
   switch (piece) {
@@ -62,15 +74,28 @@ void loop() {
 
   }
 
-  setValueSentOnAllFaces(mode);
+  //Put piece mode and attack into one byte value to send out
+  byte sendData = (mode * 10) + attack;
 
+  setValueSentOnAllFaces(sendData);
+
+  //Create an array of previous data on each face so we can compare it when receiving data later
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
-      prevNeighborModes[f] = getLastValueReceivedOnFace(f);
+      byte receivedData = getLastValueReceivedOnFace(f);
+      prevNeighborModes[f] = getModeFromReceivedData(receivedData);
     } else {
       prevNeighborModes[f] = STANDBY;
     }
   }
+}
+
+byte getModeFromReceivedData(byte data) {
+  return (data / 10);
+}
+
+byte getAttackFromReceivedData(byte data) {
+  return (data % 10);
 }
 
 /*
@@ -81,15 +106,24 @@ void bossMode() {
 
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
-      if (getLastValueReceivedOnFace(f) == HEAL) {
+      byte receivedData = getLastValueReceivedOnFace(f);
+      if (getModeFromReceivedData(receivedData) == HEAL) {
         if (prevNeighborModes[f] != HEAL) {
           bossHealth += 1;
+        }
+      }
+
+      if (getModeFromReceivedData(receivedData) == ATTACK) {
+        if (prevNeighborModes[f] != ATTACK) {
+          bossHealth -= getAttackFromReceivedData(receivedData);
         }
       }
     }
 
     if (bossHealth > 6) {
       bossHealth = 6;
+    } else if (bossHealth < 0) {
+      bossHealth = 0;
     }
 
   }
@@ -99,13 +133,14 @@ void playerMode() {
 
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
-      if (getLastValueReceivedOnFace(f) == HEAL) {
+      byte receivedData = getLastValueReceivedOnFace(f);
+      if (getModeFromReceivedData(receivedData) == HEAL) {
         if (prevNeighborModes[f] != HEAL) {
           playerHealth += 1;
         }
       }
 
-      if ( getLastValueReceivedOnFace(f) == STOCKPILE) {
+      if ( getModeFromReceivedData(receivedData) == STOCKPILE) {
         if (prevNeighborModes[f] != STOCKPILE) {
           attack += 1;
         }
@@ -141,6 +176,7 @@ void gameManagerMode() {
 */
 
 void bossDisplay() {
+  setColor(OFF);
   FOREACH_FACE(f) {
     if (f < bossHealth) {
       setFaceColor(f, RED);
@@ -150,7 +186,7 @@ void bossDisplay() {
 
 void playerDisplay() {
   FOREACH_FACE(f) {
-
+    setColor(OFF);
     //PlayerHealth is displayed on the left side using faces 0-2
     if (f < playerHealth) {
       setFaceColor(f, GREEN);
