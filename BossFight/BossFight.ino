@@ -14,7 +14,7 @@ byte piece = BOSS;
 
 void setup() {
   // put your setup code here, to run once:
-  piece = BOSS;
+  piece = PLAYER;
 }
 
 void loop() {
@@ -77,13 +77,15 @@ void bossDisplay() {
 
 void playerDisplay() {
   FOREACH_FACE(f) {
-   
+
+   //PlayerHealth is displayed on the left side using faces 0-2
     if (f < playerHealth) {
       setFaceColor(f, GREEN);
     }
 
+    //Attack value is displayed on right side using faces 3-5
     if (f < attack){
-      setFaceColor(f + 3, BLUE);
+      setFaceColor(5-f, BLUE);
     }
 
   }
