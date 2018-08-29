@@ -35,15 +35,18 @@ void setup() {
   // put your setup code here, to run once:
   piece = PLAYER;
 
+  //At the start of the game, the Boss will always send out that it is in Bossmode
   if (piece == BOSS){
     mode = BOSSMODE;
   }
 
+  //At the start of the game, the Player will always send out that it is attacking and have an attack of 1
   if (piece == PLAYER) {
     mode = ATTACK;
     attack = 1;
   }
 
+  //The GameManager will always start out in heal mode
   if (piece == GAMEMANAGER) {
     mode = HEAL;
   }
@@ -52,9 +55,7 @@ void setup() {
 
 void loop() {
 
-  Serial.println(bossHealth);
-  // put your main code here, to run repeatedly:
-
+  //When a piece is given one of these roles, assign the logic and display code
   switch (piece) {
 
     case BOSS:
@@ -95,6 +96,7 @@ void loop() {
   }
 }
 
+//Call these formulas when we want to separate the sent data
 byte getModeFromReceivedData(byte data) {
   return (data / 10);
 }
@@ -112,12 +114,15 @@ void bossMode() {
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
       byte receivedData = getLastValueReceivedOnFace(f);
+
+      //If the GameManager is sending Heal, only Heal the first time Heal is sent
       if (getModeFromReceivedData(receivedData) == HEAL) {
         if (prevNeighborModes[f] != HEAL) {
           bossHealth += 1;
         }
       }
 
+      //If a Player is attacking you, only take the damage of Attack when it is first sent
       if (getModeFromReceivedData(receivedData) == ATTACK) {
         if (prevNeighborModes[f] != ATTACK) {
           bossHealth -= getAttackFromReceivedData(receivedData);
@@ -125,9 +130,10 @@ void bossMode() {
       }
     }
 
+    //The Boss's health cannot be more than 6 or less than 0
     if (bossHealth > 6) {
       bossHealth = 6;
-    } else if (bossHealth < 1) {
+    } else if (bossHealth <= 0) {
       bossHealth = 0;
     }
 
@@ -139,18 +145,22 @@ void playerMode() {
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
       byte receivedData = getLastValueReceivedOnFace(f);
+
+      //Heal the player the first time Heal is sent
       if (getModeFromReceivedData(receivedData) == HEAL) {
         if (prevNeighborModes[f] != HEAL) {
           playerHealth += 1;
         }
       }
 
+      //Add +1 Attack when the GameManager is connected and in Stockpile mode
       if ( getModeFromReceivedData(receivedData) == STOCKPILE) {
         if (prevNeighborModes[f] != STOCKPILE) {
           attack += 1;
         }
       }
 
+      //When the Player connects to the Boss, always reduce the attack damage back to 1
       if ( getModeFromReceivedData(receivedData) == BOSSMODE) {
         if (prevNeighborModes[f] != BOSSMODE) {
           attack = 1;
@@ -159,6 +169,7 @@ void playerMode() {
     }
   }
 
+  //Both the PlayerHealth and attack cannot be greater than 3
   if (playerHealth > 3) {
     playerHealth = 3;
   }
