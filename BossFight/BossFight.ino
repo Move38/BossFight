@@ -1,8 +1,7 @@
-
 byte bossHealth = 3;
 
 byte attack = 0;
-byte playerHealth = 1;
+byte playerHealth = 3;
 
 enum pieces {
   BOSS,
@@ -36,13 +35,13 @@ void setup() {
   piece = PLAYER;
 
   //At the start of the game, the Boss will always send out that it is in Bossmode
-  if (piece == BOSS){
+  if (piece == BOSS) {
     mode = BOSSMODE;
   }
 
   //At the start of the game, the Player will always send out that it is attacking and have an attack of 1
   if (piece == PLAYER) {
-    mode = ATTACK;
+    mode = STANDBY;
     attack = 1;
   }
 
@@ -142,6 +141,14 @@ void bossMode() {
 
 void playerMode() {
 
+  if (buttonPressed()) {
+    mode = ATTACK;
+  }
+
+  if (isAlone()) {
+    mode = STANDBY;
+  }
+
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
       byte receivedData = getLastValueReceivedOnFace(f);
@@ -160,10 +167,12 @@ void playerMode() {
         }
       }
 
-      //When the Player connects to the Boss, always reduce the attack damage back to 1
-      if ( getModeFromReceivedData(receivedData) == BOSSMODE) {
-        if (prevNeighborModes[f] != BOSSMODE) {
-          attack = 1;
+      if (mode == ATTACK) {
+        //When the Player connects to the Boss, always reduce the attack damage back to 1
+        if ( getModeFromReceivedData(receivedData) == BOSSMODE) {
+          if (prevNeighborModes[f] != BOSSMODE) {
+            attack = 1;
+          }
         }
       }
     }
