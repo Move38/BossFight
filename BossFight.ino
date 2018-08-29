@@ -39,6 +39,7 @@ Timer runeTimer;
 
 byte health = 0;
 byte attack = 0;
+byte injuryValue = 0;
 
 enum pieces {
   BOSS,
@@ -91,15 +92,15 @@ void loop() {
       break;
 
     case RUNE:
-      RUNEMode();
-      RUNEDisplay();
+      runeMode();
+      runeDisplay();
       break;
   }
 
   // share which piece type we are and the mode we are in
   // lower 2 bits communicate the piece type - -
   // upper 4 bits communicate the piece mode - - - -
-  byte sendData = mode << 2 + piece;
+  byte sendData = (mode << 2) + piece;
 
   setValueSentOnAllFaces(sendData);
 }
@@ -167,6 +168,7 @@ byte getAttackValue( byte data ) {
 */
 
 void bossMode() {
+  // TODO: boss fight mode
 
   // if the button is pressed and I have my worthy opponents attached, then enter boss fight mode...
   //  if( buttonPressed() ) {
@@ -185,21 +187,12 @@ void bossMode() {
         //If the RUNE is sending Heal, only Heal the first time Heal is sent
         if (neighborPiece == RUNE && neighborMode == HEAL) {
 
-          health += 1;
           mode = HEALED;  // insures we simple heal once
-
         }
 
         //If a Player is attacking you, only take the damage of Attack when it is first sent
         if (neighborPiece == PLAYER && isAttackMode(neighborMode)) {
-
-          // no kicking a dead horse... 0 health is the lowest we go
-          if ( health >= getAttackValue(neighborMode)) {
-            health -= getAttackValue(neighborMode);
-          }
-          else {
-            health = 0;
-          }
+          injuryValue = getAttackValue(neighborMode);
           mode = INJURED;
         }
       }
@@ -208,12 +201,30 @@ void bossMode() {
 
   // do this if we are in attack mode
   if (isAttackMode( mode )) {
-
+    // see if we injured all of our neighbors, when we did, switch back to standby
   }
 
   // do this if we are in healed mode
   if (mode == HEALED) {
 
+    health += 1;
+
+    if (health > PLAYER_MAX_HEALTH) {
+      health = PLAYER_MAX_HEALTH;
+    }
+
+    mode = STANDBY;
+  }
+
+  else if (mode == INJURED) {
+    // no kicking a dead horse... 0 health is the lowest we go
+    if ( health >= injuryValue ) {
+      health -= injuryValue;
+    }
+    else {
+      health = 0;
+    }
+    mode = STANDBY;
   }
   // do this if we are in boss fight mode
   if (mode == BOSSFIGHT) {
@@ -256,6 +267,7 @@ void playerMode() {
         else if (neighborPiece == RUNE && neighborMode == STOCKPILE) {
           mode = ARMED;
         }
+        // TODO: handle the boss hitting us
       }
     }
   }
@@ -269,13 +281,13 @@ void playerMode() {
   else if (mode == HEALED) {
     health += 1;
     if (health > PLAYER_MAX_HEALTH) {
-      attack = PLAYER_MAX_HEALTH;
+      health = PLAYER_MAX_HEALTH;
     }
     mode = STANDBY;
   }
 }
 
-void RUNEMode() {
+void runeMode() {
 
   //charge up to be a healer or a stockpiler... shotcaller, baller...
   if (buttonPressed()) {
@@ -359,7 +371,7 @@ void playerDisplay() {
   }
 }
 
-void RUNEDisplay() {
+void runeDisplay() {
   if (mode == HEAL) {
     setColor(GREEN);
   }
