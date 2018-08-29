@@ -1,107 +1,158 @@
-byte bossHealth = 3;
+/*
+    Boss Fight
 
+    Data structure:
+         piece   |   mode    |   value
+        ------------------------------
+    i.e. PLAYER  |   ATTACK  |     2
+
+    data = 2 bits for piece type, 2 bits for mode, 2 bits for value
+
+    - or -
+
+         piece   |   mode
+        ----------------------
+    i.e. PLAYER  |   ATTACK2
+
+    data = 2 bits for piece type, 4 bits for mode... (safer for the time being)
+
+    by Jusin Ha
+    08.29.2018
+*/
+#include "Serial.h"
+
+ServicePortSerial Serial;     // HELP US! We need some sign of life... or at least text debugging
+
+
+#define BOSS_MAX_HEALTH      6      //
+#define BOSS_START_HEALTH    3      //
+#define PLAYER_MAX_HEALTH    3      //
+#define PLAYER_START_HEALTH  3      // 
+#define PLAYER_MAX_ATTACK    3      // the apprentice becomes the master
+#define PLAYER_START_ATTACK  1      // we have little fighting experience
+
+byte health = 0;
 byte attack = 0;
-byte playerHealth = 3;
 
 enum pieces {
   BOSS,
   PLAYER,
-  GAMEMANAGER
+  RUNE,
+  NUM_PIECE_TYPES     //   a handy way to count the entries in an enum
 };
 
 byte piece = BOSS;
 
 enum modes {
   STANDBY,
-  ATTACK,
-  STOCKPILE,
-  HEAL,
-  BOSSMODE
+  ATTACK1,      // players and boss can attack at multiple hit points
+  ATTACK2,
+  ATTACK3,
+  INJURED,      // confirm that the hit has been received
+  STOCKPILE,    // get those arms
+  ARMED,        // let our dealer know we received our arms
+  HEAL,         // pop some meds... echinachae tea
+  HEALED,       // flaunt your tea
+  BOSSFIGHT     // for the waiting period before a boss attacks or heals
 };
 
 byte mode = STANDBY;
 
-byte prevNeighborModes[6];
-
-#include "Serial.h"
-
-ServicePortSerial Serial;
 
 void setup() {
-
   Serial.begin();
-
-  // put your setup code here, to run once:
-  piece = PLAYER;
-
-  //At the start of the game, the Boss will always send out that it is in Bossmode
-  if (piece == BOSS) {
-    mode = BOSSMODE;
-  }
-
-  //At the start of the game, the Player will always send out that it is attacking and have an attack of 1
-  if (piece == PLAYER) {
-    mode = STANDBY;
-    attack = 1;
-  }
-
-  //The GameManager will always start out in heal mode
-  if (piece == GAMEMANAGER) {
-    mode = HEAL;
-  }
-
 }
 
 void loop() {
+
+  if ( buttonDoubleClicked() ) {
+    byte nextPiece = (piece + 1) % NUM_PIECE_TYPES;
+    setPieceType( nextPiece );
+  }
 
   //When a piece is given one of these roles, assign the logic and display code
   switch (piece) {
 
     case BOSS:
-
       bossMode();
       bossDisplay();
-
       break;
 
     case PLAYER:
-
       playerMode();
       playerDisplay();
-
       break;
 
-    case GAMEMANAGER:
-
-      gameManagerMode();
-      gameManagerDisplay();
+    case RUNE:
+      RUNEMode();
+      RUNEDisplay();
       break;
-
   }
 
-  //Put piece mode and attack into one byte value to send out
-  byte sendData = (mode * 10) + attack;
+  // share which piece type we are and the mode we are in
+  // lower 2 bits communicate the piece type - -
+  // upper 4 bits communicate the piece mode - - - -
+  byte sendData = mode << 2 + piece;
 
   setValueSentOnAllFaces(sendData);
+}
 
-  //Create an array of previous data on each face so we can compare it when receiving data later
-  FOREACH_FACE(f) {
-    if (!isValueReceivedOnFaceExpired(f)) {
-      byte receivedData = getLastValueReceivedOnFace(f);
-      prevNeighborModes[f] = getModeFromReceivedData(receivedData);
-    } else {
-      prevNeighborModes[f] = STANDBY;
-    }
+/*
+    Game Logic
+*/
+
+void setPieceType( byte type ) {
+
+  piece = type;
+
+  switch (piece) {
+
+    case BOSS:
+      health = BOSS_START_HEALTH;
+      mode = STANDBY;
+      break;
+
+    case PLAYER:
+      health = PLAYER_START_HEALTH;
+      attack = PLAYER_START_ATTACK;
+      mode = STANDBY;
+      break;
+
+    case RUNE:
+      mode = STANDBY;
+      break;
   }
 }
 
 //Call these formulas when we want to separate the sent data
 byte getModeFromReceivedData(byte data) {
-  return (data / 10);
+  byte mode = (data >> 2) & 15;  // keep only the 4 bits of info
+  Serial.print("mode from received data: ");
+  Serial.println(mode);
+  return mode;
 }
 
-byte getAttackFromReceivedData(byte data) {
-  return (data % 10);
+byte getPieceFromReceivedData(byte data) {
+  byte piece = data & 3;  // keep only the lower 2 bits of info
+  Serial.print("piece from received data: ");
+  Serial.println(piece);
+  return piece;
+}
+
+bool isAttackMode (byte data) {
+  return (data == ATTACK1 || data == ATTACK2 || data == ATTACK3);
+}
+
+byte getAttackValue( byte data ) {
+  byte value = 0;
+
+  switch (data) {
+    case ATTACK1: value = 1; break;
+    case ATTACK2: value = 2; break;
+    case ATTACK3: value = 3; break;
+  }
+
+  return value;
 }
 
 /*
@@ -110,33 +161,58 @@ byte getAttackFromReceivedData(byte data) {
 
 void bossMode() {
 
-  FOREACH_FACE(f) {
-    if (!isValueReceivedOnFaceExpired(f)) {
-      byte receivedData = getLastValueReceivedOnFace(f);
+  // if the button is pressed and I have my worthy opponents attached, then enter boss fight mode...
+  //  if( buttonPressed() ) {
+  //    // enter boss fight
+  //  }
 
-      //If the GameManager is sending Heal, only Heal the first time Heal is sent
-      if (getModeFromReceivedData(receivedData) == HEAL) {
-        if (prevNeighborModes[f] != HEAL) {
-          bossHealth += 1;
+  if ( mode == STANDBY ) {
+    // look at our neighbors
+    FOREACH_FACE(f) {
+      if (!isValueReceivedOnFaceExpired(f)) {
+
+        byte receivedData = getLastValueReceivedOnFace(f);
+        byte neigborMode = getModeFromReceivedData(receivedData);
+        byte neigborPiece = getPieceFromReceivedData(receivedData);
+
+        //If the RUNE is sending Heal, only Heal the first time Heal is sent
+        if (neigborPiece == RUNE && neigborMode == HEAL) {
+
+          health += 1;
+          mode = HEALED;  // insures we simple heal once
+
         }
       }
 
       //If a Player is attacking you, only take the damage of Attack when it is first sent
-      if (getModeFromReceivedData(receivedData) == ATTACK) {
-        if (prevNeighborModes[f] != ATTACK) {
-          bossHealth -= getAttackFromReceivedData(receivedData);
+      if (neigborPiece == PLAYER && isAttackMode(neigborMode)) {
+
+        // no kicking a dead horse... 0 health is the lowest we go
+        if ( health >= getAttackValue(neigborMode)) {
+          health -= getAttackValue(neigborMode);
         }
+        else {
+          health = 0;
+        }
+        mode = INJURED;
       }
     }
+  }
 
-    //The Boss's health cannot be more than 6 or less than 0
-    if (bossHealth > 6) {
-      bossHealth = 6;
-    } else if (bossHealth <= 0) {
-      bossHealth = 0;
-    }
+  // do this if we are in attack mode
+  if (isAttackMode( mode )) {
 
   }
+
+  // do this if we are in healed mode
+  if (mode == HEALED) {
+
+  }
+  // do this if we are in boss fight mode
+  if (mode == BOSSFIGHT) {
+
+  }
+
 }
 
 void playerMode() {
@@ -160,7 +236,7 @@ void playerMode() {
         }
       }
 
-      //Add +1 Attack when the GameManager is connected and in Stockpile mode
+      //Add +1 Attack when the RUNE is connected and in Stockpile mode
       if ( getModeFromReceivedData(receivedData) == STOCKPILE) {
         if (prevNeighborModes[f] != STOCKPILE) {
           attack += 1;
@@ -189,7 +265,7 @@ void playerMode() {
 
 }
 
-void gameManagerMode() {
+void RUNEMode() {
 
   //Switch between the heal and stockpile state
   if (buttonDoubleClicked()) {
@@ -231,7 +307,7 @@ void playerDisplay() {
   }
 }
 
-void gameManagerDisplay() {
+void RUNEDisplay() {
   if (mode == HEAL) {
     setColor(GREEN);
   }
