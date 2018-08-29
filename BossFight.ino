@@ -106,7 +106,7 @@ void loop() {
 }
 
 /*
-    Game Logic
+    Game Convenience Functions
 */
 
 void setPieceType( byte type ) {
@@ -163,8 +163,9 @@ byte getAttackValue( byte data ) {
   return value;
 }
 
+
 /*
-  Game Code
+   BOSS LOGIC
 */
 
 void bossMode() {
@@ -209,8 +210,8 @@ void bossMode() {
 
     health += 1;
 
-    if (health > PLAYER_MAX_HEALTH) {
-      health = PLAYER_MAX_HEALTH;
+    if (health > BOSS_MAX_HEALTH) {
+      health = BOSS_MAX_HEALTH;
     }
 
     mode = STANDBY;
@@ -233,6 +234,9 @@ void bossMode() {
 
 }
 
+/*
+   PLAYER LOGIC
+*/
 void playerMode() {
 
   if (buttonPressed()) {
@@ -253,13 +257,15 @@ void playerMode() {
     }
   }
 
-  if (mode == STANDBY) {
-    FOREACH_FACE(f) {
-      if (!isValueReceivedOnFaceExpired(f)) {
+  FOREACH_FACE(f) {
 
-        byte receivedData = getLastValueReceivedOnFace(f);
-        byte neighborMode = getModeFromReceivedData(receivedData);
-        byte neighborPiece = getPieceFromReceivedData(receivedData);
+    if (!isValueReceivedOnFaceExpired(f)) {
+
+      byte receivedData = getLastValueReceivedOnFace(f);
+      byte neighborMode = getModeFromReceivedData(receivedData);
+      byte neighborPiece = getPieceFromReceivedData(receivedData);
+
+      if (mode == STANDBY) {
 
         if ( neighborPiece == RUNE && neighborMode == HEAL ) {
           mode = HEALED;  // let the healer know we got their good deed
@@ -269,24 +275,31 @@ void playerMode() {
         }
         // TODO: handle the boss hitting us
       }
+      else if (mode == ARMED) {
+        if (neighborPiece == RUNE && neighborMode == STANDBY) {
+          attack += 1;
+          if (attack > PLAYER_MAX_ATTACK) {
+            attack = PLAYER_MAX_ATTACK;
+          }
+          mode = STANDBY;
+        }
+      }
+      else if (mode == HEALED) {
+        if (neighborPiece == RUNE && neighborMode == STANDBY) {
+          health += 1;
+          if (health > PLAYER_MAX_HEALTH) {
+            health = PLAYER_MAX_HEALTH;
+          }
+          mode = STANDBY;
+        }
+      }
     }
-  }
-  else if (mode == ARMED) {
-    attack += 1;
-    if (attack > PLAYER_MAX_ATTACK) {
-      attack = PLAYER_MAX_ATTACK;
-    }
-    mode = STANDBY;
-  }
-  else if (mode == HEALED) {
-    health += 1;
-    if (health > PLAYER_MAX_HEALTH) {
-      health = PLAYER_MAX_HEALTH;
-    }
-    mode = STANDBY;
-  }
+  } // end of loop for looking at neighbors
 }
 
+/*
+   RUNE LOGIC
+*/
 void runeMode() {
 
   //charge up to be a healer or a stockpiler... shotcaller, baller...
