@@ -31,6 +31,9 @@ ServicePortSerial Serial;     // HELP US! We need some sign of life... or at lea
 #define PLAYER_MAX_ATTACK    3      // the apprentice becomes the master
 #define PLAYER_START_ATTACK  1      // we have little fighting experience
 
+#define PLAYER_ATTACK_TIMEOUT  4000 // apparently we didn't want to fight in the first place
+Timer attackTimer;
+
 byte health = 0;
 byte attack = 0;
 
@@ -219,10 +222,15 @@ void playerMode() {
 
   if (buttonPressed()) {
     mode = ATTACK;
+    attackTimer.set(PLAYER_ATTACK_TIMEOUT);
   }
 
   if (isAlone()) {
-    mode = STANDBY;
+    // time out
+    if(attackTimer.isExpired()) {
+      mode = STANDBY;
+      attackTimer.set(NEVER);
+    }
   }
 
   FOREACH_FACE(f) {
