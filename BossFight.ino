@@ -41,6 +41,8 @@ byte health = 0;
 byte attack = 0;
 byte injuryValue = 0;
 
+bool attackSuccessful = false;
+
 enum pieces {
   BOSS,
   PLAYER,
@@ -252,6 +254,7 @@ void playerMode() {
       default:    Serial.println("how did we get here?"); break;
     }
     attackTimer.set(PLAYER_ATTACK_TIMEOUT);
+    attackSuccessful = false;
   }
 
   if (isAlone()) {
@@ -259,6 +262,7 @@ void playerMode() {
     if (attackTimer.isExpired()) {
       mode = STANDBY;
       attackTimer.set(NEVER);
+      attackSuccessful = false;
     }
   }
 
@@ -281,9 +285,14 @@ void playerMode() {
         // TODO: handle the boss hitting us
       }
       else if (isAttackMode(mode)) {
-        if ( neighborPiece == BOSS && neighborMode == STANDBY) {
-          attackTimer.set(NEVER);
-          mode = STANDBY;
+        if ( neighborPiece == BOSS && neighborMode == INJURED) {
+
+          if (attackSuccessful) {
+            mode = STANDBY;
+            // always return our attack to 1
+            attack = 1;
+          }
+          attackSuccessful = true;
         }
       }
       else if (mode == ARMED) {
@@ -372,6 +381,9 @@ void bossDisplay() {
     if (f < health) {
       setFaceColor(f, RED);
     }
+  }
+  if (mode == INJURED) {
+    setFaceColor(5, YELLOW);
   }
 }
 
