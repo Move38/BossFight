@@ -176,15 +176,15 @@ void bossMode() {
   //    // enter boss fight
   //  }
 
-  if ( mode == STANDBY ) {
-    // look at our neighbors
-    FOREACH_FACE(f) {
-      if (!isValueReceivedOnFaceExpired(f)) {
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
 
-        byte receivedData = getLastValueReceivedOnFace(f);
-        byte neighborMode = getModeFromReceivedData(receivedData);
-        byte neighborPiece = getPieceFromReceivedData(receivedData);
+      byte receivedData = getLastValueReceivedOnFace(f);
+      byte neighborMode = getModeFromReceivedData(receivedData);
+      byte neighborPiece = getPieceFromReceivedData(receivedData);
 
+
+      if ( mode == STANDBY ) {
         //If the RUNE is sending Heal, only Heal the first time Heal is sent
         if (neighborPiece == RUNE && neighborMode == HEAL) {
 
@@ -197,41 +197,46 @@ void bossMode() {
           mode = INJURED;
         }
       }
+      // do this if we are in attack mode
+      else if (isAttackMode( mode )) {
+        // see if we injured all of our neighbors, when we did, switch back to standby
+      }
+
+      // do this if we are in healed mode
+      else if (mode == HEALED) {
+        if (neighborPiece == RUNE && neighborMode == STANDBY) {
+
+          health += 1;
+
+          if (health > BOSS_MAX_HEALTH) {
+            health = BOSS_MAX_HEALTH;
+          }
+
+          mode = STANDBY;
+        }
+      }
+
+      else if (mode == INJURED) {
+        if (neighborPiece == PLAYER && neighborMode == STANDBY) {
+
+          // no kicking a dead horse... 0 health is the lowest we go
+          if ( health >= injuryValue ) {
+            health -= injuryValue;
+            injuryValue = 0;  // not necessary but a good piece of mind
+          }
+          else {
+            health = 0;
+          }
+          mode = STANDBY;
+        }
+      }
     }
   }
 
-  // do this if we are in attack mode
-  if (isAttackMode( mode )) {
-    // see if we injured all of our neighbors, when we did, switch back to standby
-  }
-
-  // do this if we are in healed mode
-  if (mode == HEALED) {
-
-    health += 1;
-
-    if (health > BOSS_MAX_HEALTH) {
-      health = BOSS_MAX_HEALTH;
-    }
-
-    mode = STANDBY;
-  }
-
-  else if (mode == INJURED) {
-    // no kicking a dead horse... 0 health is the lowest we go
-    if ( health >= injuryValue ) {
-      health -= injuryValue;
-    }
-    else {
-      health = 0;
-    }
-    mode = STANDBY;
-  }
   // do this if we are in boss fight mode
   if (mode == BOSSFIGHT) {
 
   }
-
 }
 
 /*
@@ -275,6 +280,12 @@ void playerMode() {
         }
         // TODO: handle the boss hitting us
       }
+      else if (isAttackMode(mode)) {
+        if ( neighborPiece == BOSS && neighborMode == STANDBY) {
+          attackTimer.set(NEVER);
+          mode = STANDBY;
+        }
+      }
       else if (mode == ARMED) {
         if (neighborPiece == RUNE && neighborMode == STANDBY) {
           attack += 1;
@@ -313,36 +324,30 @@ void runeMode() {
     }
   }
 
-  if (mode == STANDBY) {
-    // nothing to see here
-  }
-  else if (mode == HEAL) {
-    // return to standby if we see that we successfully healed our neighbor
-    FOREACH_FACE(f) {
-      if (!isValueReceivedOnFaceExpired(f)) {
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
 
-        byte receivedData = getLastValueReceivedOnFace(f);
-        byte neighborMode = getModeFromReceivedData(receivedData);
-        byte neighborPiece = getPieceFromReceivedData(receivedData);
+      byte receivedData = getLastValueReceivedOnFace(f);
+      byte neighborMode = getModeFromReceivedData(receivedData);
+      byte neighborPiece = getPieceFromReceivedData(receivedData);
+
+      if (mode == STANDBY) {
+        // nothing to see here
+      }
+      else if (mode == HEAL) {
+        // return to standby if we see that we successfully healed our neighbor
 
         if ( (neighborPiece == PLAYER || neighborPiece == BOSS) && neighborMode == HEALED) {
           mode = STANDBY;
         }
       }
-    }
-  }
-  else if (mode == STOCKPILE) {
-    // return to standby if we see that we successfully armed our neighbor
-    FOREACH_FACE(f) {
-      if (!isValueReceivedOnFaceExpired(f)) {
-
-        byte receivedData = getLastValueReceivedOnFace(f);
-        byte neighborMode = getModeFromReceivedData(receivedData);
-        byte neighborPiece = getPieceFromReceivedData(receivedData);
+      else if (mode == STOCKPILE) {
+        // return to standby if we see that we successfully armed our neighbor
 
         if ( neighborPiece == PLAYER && neighborMode == ARMED) {
           mode = STANDBY;
         }
+
       }
     }
   }
@@ -380,6 +385,12 @@ void playerDisplay() {
     //Attack value is displayed on right side using faces 3-5
     if (f < attack) {
       setFaceColor(5 - f, BLUE);
+    }
+  }
+  if (isAttackMode(mode)) {
+    // flash white
+    if ((millis() / 500) % 2 == 0) {
+      setFaceColor(0, WHITE);
     }
   }
 }
