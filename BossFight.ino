@@ -75,7 +75,7 @@ void setup() {
 
 void loop() {
 
-  if ( buttonDoubleClicked() ) {
+  if ( buttonLongPressed() ) {
     byte nextPiece = (piece + 1) % NUM_PIECE_TYPES;
     setPieceType( nextPiece );
   }
