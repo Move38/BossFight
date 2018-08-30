@@ -13,7 +13,7 @@ Multiplayer _coopetition_ game where all players work together to defeat 1 Boss,
 ## Setup
 To play Boss Fight(WIP) you need 3 types of pieces.
 1. **Avatar** - this is you for all intents and purposes and you will gain health, build up your attack, and hopefully defeat the man. (yup, I just decided this game is about overthrowing _the man_)
-2. **Game manager** - think of this as a referee. It will be responsible for managing actions and rounds
+2. **Rune** - think of this as a magical token. It is avaiable each turn to give health or stockpile weapons. (do you want XP or HP?)
 3. **Boss** - this wouldn't be very exciting without _the man_ to defeat. The boss shows its health at all times and takes damage from players hits. The boss heals every round, so you'll have to be swift in the killing.
 
 ## Gameplay
