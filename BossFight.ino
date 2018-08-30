@@ -388,6 +388,11 @@ void playerMode() {
   if (health == 0) {
     mode = DEAD;
   }
+  
+  // respawn when we pull our piece away
+  if( mode == DEAD && isAlone() ) {
+    setPieceType(PLAYER);
+  }
 }
 
 /*
