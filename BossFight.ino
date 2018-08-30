@@ -1,20 +1,25 @@
 /*
     Boss Fight
 
+    Work together to remain safe while defeating a boss, 
+    only one player gets to claim victory.
+    
+    Each turn, a player is given the option to:
+    1. attack the boss 
+    2. heal herself 
+    3. heal another 
+    4. stockpile arms
+    5. gift arms to another
+    
+    Each round, the players face their possible fate as they face off 
+    against the boss that might heal itself or deal the damage.
+    
     Data structure:
-         piece   |   mode    |   value
-        ------------------------------
-    i.e. PLAYER  |   ATTACK  |     2
-
-    data = 2 bits for piece type, 2 bits for mode, 2 bits for value
-
-    - or -
-
          piece   |   mode
         ----------------------
     i.e. PLAYER  |   ATTACK2
 
-    data = 2 bits for piece type, 4 bits for mode... (safer for the time being)
+    data = 2 bits for piece type, 4 bits for mode...
 
     by Jusin Ha
     08.29.2018
@@ -291,13 +296,18 @@ void bossMode() {
   if (mode == BOSSFIGHT) {
 
   }
+
+  // did we get defeated?
+  if (health == 0) {
+    mode = DEAD;
+  }
 }
 
 /*
    PLAYER LOGIC
 */
 void playerMode() {
-  
+
   if (buttonPressed()) {
     switch (attack) {
       case 1:     mode = ATTACK1;   break;
@@ -388,9 +398,9 @@ void playerMode() {
   if (health == 0) {
     mode = DEAD;
   }
-  
+
   // respawn when we pull our piece away
-  if( mode == DEAD && isAlone() ) {
+  if ( mode == DEAD && isAlone() ) {
     setPieceType(PLAYER);
   }
 }
@@ -463,6 +473,11 @@ void bossDisplay() {
   if (mode == INJURED) {
     setFaceColor(5, YELLOW);
   }
+
+  if (mode == DEAD) {
+    // something red
+    setFaceColor(rand(6), dim(RED, rand(255)));
+  }
 }
 
 void playerDisplay() {
@@ -490,7 +505,7 @@ void playerDisplay() {
       setColor(dim(BLUE, 127));
     }
     else {
-      setColor(dim(GREEN, 127));      
+      setColor(dim(GREEN, 127));
     }
   }
 }
