@@ -490,7 +490,7 @@ void bossDisplay() {
     setFaceColor(rand(6), dim(RED, rand(255)));
   }
 
-  if (mode == ATTACKBUFF) {
+  if (bossBuffed) {
     setFaceColor(0, MAGENTA);
   }
 }
