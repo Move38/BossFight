@@ -1,19 +1,19 @@
 /*
     Boss Fight
 
-    Work together to remain safe while defeating a boss, 
+    Work together to remain safe while defeating a boss,
     only one player gets to claim victory.
-    
+
     Each turn, a player is given the option to:
-    1. attack the boss 
-    2. heal herself 
-    3. heal another 
+    1. attack the boss
+    2. heal herself
+    3. heal another
     4. stockpile arms
     5. gift arms to another
-    
-    Each round, the players face their possible fate as they face off 
+
+    Each round, the players face their possible fate as they face off
     against the boss that might heal itself or deal the damage.
-    
+
     Data structure:
          piece   |   mode
         ----------------------
@@ -36,8 +36,9 @@ ServicePortSerial Serial;     // HELP US! We need some sign of life... or at lea
 #define PLAYER_MAX_ATTACK    3      // the apprentice becomes the master
 #define PLAYER_START_ATTACK  1      // we have little fighting experience
 
-#define BOSS_PROB_HEAL       6      //  ratio for bossFight option
+#define BOSS_PROB_HEAL       1      //  ratio for bossFight option
 #define BOSS_PROB_FIGHT      1      //
+#define BOSS_BUFFED          1      // Make the boss do +1 more damage 
 
 #define PLAYER_ATTACK_TIMEOUT  4000 // apparently we didn't want to fight in the first place
 Timer attackTimer;
@@ -51,6 +52,8 @@ byte injuryValue = 0;
 
 bool attackSuccessful = false;
 
+bool bossBuffed; 
+
 enum pieces {
   BOSS,
   PLAYER,
@@ -62,9 +65,10 @@ byte piece;
 
 enum modes {
   STANDBY,
-  ATTACK1,      // players and boss can attack at multiple hit points
+  ATTACK1,      // players and boss can attack at multiple hit point
   ATTACK2,
   ATTACK3,
+  ATTACKBUFF,  // Buffed attack of Boss
   INJURED,      // confirm that the hit has been received
   STOCKPILE,    // get those arms
   ARMED,        // let our dealer know we received our arms
@@ -159,7 +163,7 @@ byte getPieceFromReceivedData(byte data) {
 }
 
 bool isAttackMode (byte data) {
-  return (data == ATTACK1 || data == ATTACK2 || data == ATTACK3);
+  return (data == ATTACK1 || data == ATTACK2 || data == ATTACK3 || data == ATTACKBUFF);
 }
 
 byte getNumberOfNeighbors() {
@@ -198,17 +202,11 @@ void bossMode() {
     if (!isAlone()) {
       // random chance that we heal ourselves or dole out the pain
       byte diceRoll = rand(BOSS_PROB_HEAL + BOSS_PROB_FIGHT);
-      if ( diceRoll > BOSS_PROB_HEAL ) {
+      if ( diceRoll > BOSS_PROB_HEAL && bossBuffed == false) {
         // LET'S FIGHT
-        switch (health) {
-          case 1: mode = ATTACK1; break;
-          case 2: mode = ATTACK2; break;
-          case 3: mode = ATTACK3; break;
-          case 4:
-          case 5:
-          case 6: mode = ATTACK3; break;
-          default: break;
-        }
+       mode = ATTACK1; 
+      } else if (diceRoll > BOSS_PROB_HEAL && bossBuffed == true){
+        mode = ATTACKBUFF;
       }
       else {
         // DRINK SOME TEA AND REST UP
@@ -235,6 +233,10 @@ void bossMode() {
         if (neighborPiece == RUNE && neighborMode == HEAL) {
 
           mode = HEALED;  // insures we simple heal once
+        }
+
+        if (neighborPiece == RUNE && neighborMode == STOCKPILE){
+          mode = ARMED;
         }
 
         //If a Player is attacking you, only take the damage of Attack when it is first sent
@@ -266,6 +268,11 @@ void bossMode() {
 
           mode = STANDBY;
         }
+      }
+
+      else if (mode == ARMED){
+        bossBuffed = true;
+        mode = STANDBY; 
       }
 
       else if (mode == INJURED) {
@@ -346,7 +353,11 @@ void playerMode() {
         }
         // TODO: handle the boss hitting us
         else if (neighborPiece == BOSS && isAttackMode(neighborMode)) {
-          injuryValue = getAttackValue(neighborMode);
+          if (neighborMode == ATTACK1) {
+            injuryValue = attack;
+          } else if (neighborMode == ATTACKBUFF) {
+            injuryValue = attack + 1;
+          }
           mode = INJURED;
         }
       }
@@ -441,7 +452,7 @@ void runeMode() {
       else if (mode == STOCKPILE) {
         // return to standby if we see that we successfully armed our neighbor
 
-        if ( neighborPiece == PLAYER && neighborMode == ARMED) {
+        if ( (neighborPiece == PLAYER  || neighborPiece == BOSS) && neighborMode == ARMED) {
           mode = STANDBY;
         }
 
@@ -467,7 +478,7 @@ void bossDisplay() {
   setColor(OFF);
   FOREACH_FACE(f) {
     if (f < health) {
-      setFaceColor(f, RED);
+      setFaceColor(f, dim(RED, 127));
     }
   }
   if (mode == INJURED) {
@@ -477,6 +488,10 @@ void bossDisplay() {
   if (mode == DEAD) {
     // something red
     setFaceColor(rand(6), dim(RED, rand(255)));
+  }
+
+  if (mode == ATTACKBUFF) {
+    setFaceColor(0, MAGENTA);
   }
 }
 
@@ -489,7 +504,7 @@ void playerDisplay() {
     }
     //Attack value is displayed on right side using faces 3-5
     if (f < attack) {
-      setFaceColor(5 - f, BLUE);
+      setFaceColor(5 - f, ORANGE);
     }
   }
   if (isAttackMode(mode)) {
@@ -515,7 +530,7 @@ void runeDisplay() {
     setColor(GREEN);
   }
   else if (mode == STOCKPILE) {
-    setColor(BLUE);
+    setColor(ORANGE);
   }
   else {  // STANDBY
     setColor(dim(WHITE, 127));
