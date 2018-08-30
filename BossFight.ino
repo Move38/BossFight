@@ -31,6 +31,9 @@ ServicePortSerial Serial;     // HELP US! We need some sign of life... or at lea
 #define PLAYER_MAX_ATTACK    3      // the apprentice becomes the master
 #define PLAYER_START_ATTACK  1      // we have little fighting experience
 
+#define BOSS_PROB_HEAL       6      //  ratio for bossFight option
+#define BOSS_PROB_FIGHT      1      //
+
 #define PLAYER_ATTACK_TIMEOUT  4000 // apparently we didn't want to fight in the first place
 Timer attackTimer;
 
@@ -62,7 +65,8 @@ enum modes {
   ARMED,        // let our dealer know we received our arms
   HEAL,         // pop some meds... echinachae tea
   HEALED,       // flaunt your tea
-  BOSSFIGHT     // for the waiting period before a boss attacks or heals
+  BOSSFIGHT,    // for the waiting period before a boss attacks or heals
+  DEAD          // if our health is 0 as a player
 };
 
 byte mode = STANDBY;
@@ -153,6 +157,16 @@ bool isAttackMode (byte data) {
   return (data == ATTACK1 || data == ATTACK2 || data == ATTACK3);
 }
 
+byte getNumberOfNeighbors() {
+  byte numNeighbors = 0;
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {
+      numNeighbors++;
+    }
+  }
+  return numNeighbors;
+}
+
 byte getAttackValue( byte data ) {
   byte value = 0;
 
@@ -173,10 +187,35 @@ byte getAttackValue( byte data ) {
 void bossMode() {
   // TODO: boss fight mode
 
-  // if the button is pressed and I have my worthy opponents attached, then enter boss fight mode...
-  //  if( buttonPressed() ) {
-  //    // enter boss fight
-  //  }
+  //   if the button is pressed and I have my worthy opponents attached, then enter boss fight mode...
+  if ( buttonPressed() ) {
+    // enter boss fight
+    if (!isAlone()) {
+      // random chance that we heal ourselves or dole out the pain
+      byte diceRoll = rand(BOSS_PROB_HEAL + BOSS_PROB_FIGHT);
+      if ( diceRoll > BOSS_PROB_HEAL ) {
+        // LET'S FIGHT
+        switch (health) {
+          case 1: mode = ATTACK1; break;
+          case 2: mode = ATTACK2; break;
+          case 3: mode = ATTACK3; break;
+          case 4:
+          case 5:
+          case 6: mode = ATTACK3; break;
+          default: break;
+        }
+      }
+      else {
+        // DRINK SOME TEA AND REST UP
+        mode = HEALED;
+      }
+    }
+    else {
+      // no fight to be had
+    }
+  }
+
+  bool injuredAllNeighbors = true;
 
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {
@@ -195,18 +234,24 @@ void bossMode() {
 
         //If a Player is attacking you, only take the damage of Attack when it is first sent
         if (neighborPiece == PLAYER && isAttackMode(neighborMode)) {
-          injuryValue = getAttackValue(neighborMode);
-          mode = INJURED;
+          // only allow a player to injur the boss when attacking alone, no ganging up
+          if (getNumberOfNeighbors() == 1) {
+            injuryValue = getAttackValue(neighborMode);
+            mode = INJURED;
+          }
         }
       }
       // do this if we are in attack mode
       else if (isAttackMode( mode )) {
         // see if we injured all of our neighbors, when we did, switch back to standby
+        if (neighborPiece == PLAYER && neighborMode != INJURED) {
+          injuredAllNeighbors = false;
+        }
       }
 
-      // do this if we are in healed mode
+      // do this if we are in healed mode (this includes when in a bossfight)
       else if (mode == HEALED) {
-        if (neighborPiece == RUNE && neighborMode == STANDBY) {
+        if ((neighborPiece == RUNE || neighborPiece == PLAYER) && neighborMode == STANDBY) {
 
           health += 1;
 
@@ -235,6 +280,13 @@ void bossMode() {
     }
   }
 
+  // only enter standby afer we have injured all of our neighbors...
+  if ( isAttackMode( mode )) {
+    if (injuredAllNeighbors) {
+      mode = STANDBY;
+    }
+  }
+
   // do this if we are in boss fight mode
   if (mode == BOSSFIGHT) {
 
@@ -245,7 +297,7 @@ void bossMode() {
    PLAYER LOGIC
 */
 void playerMode() {
-
+  
   if (buttonPressed()) {
     switch (attack) {
       case 1:     mode = ATTACK1;   break;
@@ -283,6 +335,10 @@ void playerMode() {
           mode = ARMED;
         }
         // TODO: handle the boss hitting us
+        else if (neighborPiece == BOSS && isAttackMode(neighborMode)) {
+          injuryValue = getAttackValue(neighborMode);
+          mode = INJURED;
+        }
       }
       else if (isAttackMode(mode)) {
         if ( neighborPiece == BOSS && neighborMode == INJURED) {
@@ -313,8 +369,25 @@ void playerMode() {
           mode = STANDBY;
         }
       }
+      else if (mode == INJURED) {
+        if (neighborPiece == BOSS && neighborMode == STANDBY) {
+          if ( health >= injuryValue ) {
+            health -= injuryValue;
+            injuryValue = 0;  // not necessary but a good piece of mind
+          }
+          else {
+            health = 0;
+          }
+          mode = STANDBY;
+        }
+      }
     }
   } // end of loop for looking at neighbors
+
+  // if we are at zero health we are dead
+  if (health == 0) {
+    mode = DEAD;
+  }
 }
 
 /*
@@ -403,6 +476,16 @@ void playerDisplay() {
     // flash white
     if ((millis() / 500) % 2 == 0) {
       setFaceColor(0, WHITE);
+    }
+  }
+
+  if (mode == DEAD) {
+    // flash blue and green
+    if ((millis() / 500) % 2 == 0) {
+      setColor(dim(BLUE, 127));
+    }
+    else {
+      setColor(dim(GREEN, 127));      
     }
   }
 }
