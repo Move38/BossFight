@@ -106,9 +106,16 @@ void setup() {
 
 void loop() {
 
-  if ( buttonLongPressed() ) {
-    byte nextPiece = (piece + 1) % NUM_PIECE_TYPES;
-    setPieceType( nextPiece );
+  if (buttonMultiClicked()) {
+    if (buttonClickCount() == 3) {
+      byte nextPiece = (piece + 1) % NUM_PIECE_TYPES;
+      setPieceType( nextPiece );
+    }
+  }
+
+  if (buttonLongPressed()) {
+    // reset the piece
+    setPieceType(piece);
   }
 
   //When a piece is given one of these roles, assign the logic and display code
@@ -575,16 +582,44 @@ void playerDisplay() {
   // animate a defeated player (maybe looks like a boxer seeing stars...)
 
   if (isAttackMode(mode)) {
-    // flash white
-    if ((millis() / 500) % 2 == 0) {
-      setFaceColor(0, WHITE);
+    // circle around with a trail for each attack level
+    // 1 with trail for attack 1
+    // 2 with trails on opposite sides for attack 2
+    // 3 with trails for attack 3
+    long rotation = (millis() / 3) % 360;
+    byte head = rotation / 60;
+    byte brightness;
+
+    FOREACH_FACE(f) {
+
+      byte distFromHead = (6 + head - f) % 6; // returns # of positions away from the head
+      long degFromHead = (360 + rotation - 60 * f) % 360; // returns degrees away from the head
+
+      if (attack == 2) {
+        if (distFromHead >= 3) {
+          distFromHead -= 3;
+          degFromHead -= 180;
+        }
+      }
+      else if (attack == 3) {
+        while (distFromHead >= 2) {
+          distFromHead -= 2;
+          degFromHead -= 120;
+        }
+      }
+      if (distFromHead < (4 - attack)) {
+        brightness = map_m(degFromHead, 0, 60 * (4 - attack), 255, 0); // scale the brightness to 8 bits and dimmer based on distance from head
+      } else {
+        brightness = 0; // don't show past the tail of the snake
+      }
+      setFaceColor(f, dim(ORANGE, brightness));
     }
   }
 
   if (mode == DEAD) {
     // flash blue and green
     if ((millis() / 500) % 2 == 0) {
-      setColor(dim(BLUE, 127));
+      setColor(dim(ORANGE, 127));
     }
     else {
       setColor(dim(GREEN, 127));
