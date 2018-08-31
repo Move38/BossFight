@@ -393,6 +393,8 @@ void playerMode() {
             mode = STANDBY;
             // always return our attack to 1
             attack = 1;
+            attackAniTimer.set(ATTACK_DURATION);
+            actionFace = f;
           }
           attackSuccessful = true;
         }
@@ -518,8 +520,14 @@ void bossDisplay() {
       setFaceColor(f, dim(RED, 127));
     }
   }
+  
+  if (mode == STANDBY || mode == ATTACKBUFF) {
+    // animate the loss of a health when attacked
+  }
+  
   if (mode == INJURED) {
-    setFaceColor(5, YELLOW);
+    //setFaceColor(5, YELLOW);
+    setColor(WHITE);  // flash white on hit
     // start an animation for being hit
     // we should also know from which side
   }
@@ -577,10 +585,36 @@ void playerDisplay() {
     if ( progress < t1 ) brightness = 255;
     setFaceColor(5 - attack + 1, dim(ORANGE, brightness));
   }
-  // animate an attack to the side it is attacking (rows of 2 LEDs in a flash bulb animation)
-  // animate waiting in attack mode with a pulse like demo mode
-  // animate a defeated player (maybe looks like a boxer seeing stars...)
 
+  // animate an attack to the side it is attacking (rows of 2 LEDs in a flash bulb animation)
+  if (mode == STANDBY) {
+    if (!attackAniTimer.isExpired()) {
+      // then we are healing
+      // 4 containers to remove energy from
+      FOREACH_FACE(f) {
+        long offset = ATTACK_DURATION / 6;
+        byte dist = (actionFace + 6 - f) % 6;
+        byte phase;
+        switch (dist) {
+          case 0: phase = 3; break;
+          case 1: phase = 2; break;
+          case 2: phase = 1; break;
+          case 3: phase = 0; break;
+          case 4: phase = 1; break;
+          case 5: phase = 2; break;
+        }
+        long t0 = (phase * offset) + (ATTACK_DURATION - (offset * 3));
+        long t1 = (phase * offset);
+        long progress = attackAniTimer.getRemaining();
+        byte brightness = map_m(progress, t0, t1, 255, 0);
+        if (progress > t0) brightness = 0;
+        if (progress < t1) brightness = 0;
+        setFaceColor(f, dim(ORANGE, brightness));
+      }
+    }
+  }
+
+  // animate waiting in attack mode circling around with amount of attack
   if (isAttackMode(mode)) {
     // circle around with a trail for each attack level
     // 1 with trail for attack 1
@@ -616,6 +650,7 @@ void playerDisplay() {
     }
   }
 
+  // animate a defeated player (maybe looks like a boxer seeing stars...)
   if (mode == DEAD) {
     // flash blue and green
     if ((millis() / 500) % 2 == 0) {
