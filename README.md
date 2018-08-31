@@ -1,4 +1,4 @@
-# BossFight
+# Boss Fight
 ###### by Justin Ha et al.
 
 _INSERT GIF OF GAMEPLAY_
@@ -35,6 +35,10 @@ Players can perform 1 action on their turn.
 Once every player has had their turn, all players will attach themselves to the Boss and click the Boss. 
 
 The Boss will either give itself 1 health or deal damage to every player based on how much they've stockpiled. If it's been buffed by a player, the Boss's attack will deal 1 more damage in addition to whatever damage it would deal normally. 
+
+## Death
+
+When a player loses all their health, they are out for the next round. Their health and stockpile reset to 1. 
 
 ### Negotiations
 
