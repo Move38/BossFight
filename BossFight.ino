@@ -30,15 +30,15 @@ ServicePortSerial Serial;     // HELP US! We need some sign of life... or at lea
 
 
 #define BOSS_MAX_HEALTH      6      //
-#define BOSS_START_HEALTH    3      //
+#define BOSS_START_HEALTH    2      //
 #define PLAYER_MAX_HEALTH    3      //
-#define PLAYER_START_HEALTH  3      // 
+#define PLAYER_START_HEALTH  1      // 
 #define PLAYER_MAX_ATTACK    3      // the apprentice becomes the master
 #define PLAYER_START_ATTACK  1      // we have little fighting experience
 
 #define BOSS_PROB_HEAL       1      //  ratio for bossFight option
 #define BOSS_PROB_FIGHT      1      //
-#define BOSS_BUFFED          1      // Make the boss do +1 more damage 
+#define BOSS_BUFFED_BOOST    1      // Make the boss do +1 more damage 
 
 #define PLAYER_ATTACK_TIMEOUT  4000 // apparently we didn't want to fight in the first place
 Timer attackTimer;
@@ -46,13 +46,31 @@ Timer attackTimer;
 #define RUNE_TIMEOUT  4000 // apparently we didn't want to fight in the first place
 Timer runeTimer;
 
+/*
+   ANIMATION TIMING
+*/
+#define HEAL_TRANSFER_DURATION       1000
+#define STOCKPILE_TRANSFER_DURATION  1000
+#define ATTACK_DURATION              1000
+#define INJURY_DELAY                 1000
+#define INJURY_DURATION              1000
+#define RUNE_RETURN_DURATION         2000
+
+Timer healAniTimer;
+Timer stockpileAniTimer;
+Timer attackAniTimer;
+Timer injuryAniTimer;
+Timer runeReturnTimer;
+
+byte actionFace;
+
 byte health = 0;
 byte attack = 0;
 byte injuryValue = 0;
 
 bool attackSuccessful = false;
 
-bool bossBuffed; 
+bool bossBuffed;
 
 enum pieces {
   BOSS,
@@ -88,9 +106,16 @@ void setup() {
 
 void loop() {
 
-  if ( buttonLongPressed() ) {
-    byte nextPiece = (piece + 1) % NUM_PIECE_TYPES;
-    setPieceType( nextPiece );
+  if (buttonMultiClicked()) {
+    if (buttonClickCount() == 3) {
+      byte nextPiece = (piece + 1) % NUM_PIECE_TYPES;
+      setPieceType( nextPiece );
+    }
+  }
+
+  if (buttonLongPressed()) {
+    // reset the piece
+    setPieceType(piece);
   }
 
   //When a piece is given one of these roles, assign the logic and display code
@@ -204,13 +229,15 @@ void bossMode() {
       byte diceRoll = rand(BOSS_PROB_HEAL + BOSS_PROB_FIGHT);
       if ( diceRoll > BOSS_PROB_HEAL && bossBuffed == false) {
         // LET'S FIGHT
-       mode = ATTACK1; 
-      } else if (diceRoll > BOSS_PROB_HEAL && bossBuffed == true){
+        mode = ATTACK1;
+      } else if (diceRoll > BOSS_PROB_HEAL && bossBuffed == true) {
         mode = ATTACKBUFF;
+        bossBuffed = false;
       }
       else {
         // DRINK SOME TEA AND REST UP
         mode = HEALED;
+        bossBuffed = false;
       }
     }
     else {
@@ -235,7 +262,7 @@ void bossMode() {
           mode = HEALED;  // insures we simple heal once
         }
 
-        if (neighborPiece == RUNE && neighborMode == STOCKPILE){
+        if (neighborPiece == RUNE && neighborMode == STOCKPILE) {
           mode = ARMED;
         }
 
@@ -270,9 +297,9 @@ void bossMode() {
         }
       }
 
-      else if (mode == ARMED){
+      else if (mode == ARMED) {
         bossBuffed = true;
-        mode = STANDBY; 
+        mode = STANDBY;
       }
 
       else if (mode == INJURED) {
@@ -354,9 +381,9 @@ void playerMode() {
         // TODO: handle the boss hitting us
         else if (neighborPiece == BOSS && isAttackMode(neighborMode)) {
           if (neighborMode == ATTACK1) {
-            injuryValue = attack;
+            injuryValue = attack;         // we get hit with our own arsenal
           } else if (neighborMode == ATTACKBUFF) {
-            injuryValue = attack + 1;
+            injuryValue = attack + BOSS_BUFFED_BOOST; // we get hit with our own arsenal... and then some
           }
           mode = INJURED;
         }
@@ -368,6 +395,8 @@ void playerMode() {
             mode = STANDBY;
             // always return our attack to 1
             attack = 1;
+            attackAniTimer.set(ATTACK_DURATION);
+            actionFace = f;
           }
           attackSuccessful = true;
         }
@@ -379,6 +408,10 @@ void playerMode() {
             attack = PLAYER_MAX_ATTACK;
           }
           mode = STANDBY;
+          actionFace = f;   // know which side we received the arms from
+          // animate the arming process
+          stockpileAniTimer.set(STOCKPILE_TRANSFER_DURATION);
+
         }
       }
       else if (mode == HEALED) {
@@ -388,6 +421,10 @@ void playerMode() {
             health = PLAYER_MAX_HEALTH;
           }
           mode = STANDBY;
+          actionFace = f;   // know which side we are being healed from
+          // animate the healing process
+          healAniTimer.set(HEAL_TRANSFER_DURATION);
+
         }
       }
       else if (mode == INJURED) {
@@ -447,6 +484,8 @@ void runeMode() {
 
         if ( (neighborPiece == PLAYER || neighborPiece == BOSS) && neighborMode == HEALED) {
           mode = STANDBY;
+          actionFace = f; // know which side we are healing
+          healAniTimer.set(HEAL_TRANSFER_DURATION);
         }
       }
       else if (mode == STOCKPILE) {
@@ -454,6 +493,8 @@ void runeMode() {
 
         if ( (neighborPiece == PLAYER  || neighborPiece == BOSS) && neighborMode == ARMED) {
           mode = STANDBY;
+          actionFace = f; // know which side we are stockpiling
+          stockpileAniTimer.set(STOCKPILE_TRANSFER_DURATION);
         }
 
       }
@@ -481,22 +522,38 @@ void bossDisplay() {
       setFaceColor(f, dim(RED, 127));
     }
   }
+  
+  if (mode == STANDBY || mode == ATTACKBUFF) {
+    // animate the loss of a health when attacked
+  }
+  
   if (mode == INJURED) {
-    setFaceColor(5, YELLOW);
+    //setFaceColor(5, YELLOW);
+    setColor(WHITE);  // flash white on hit
+    // start an animation for being hit
+    // we should also know from which side
   }
 
   if (mode == DEAD) {
     // something red
     setFaceColor(rand(6), dim(RED, rand(255)));
+    // this killing the boss moment should be quite an occasion
+  }
+
+  if (mode == ATTACKBUFF) {
+    // start an animation for getting buff
+    // we should also know from which side
   }
 
   if (bossBuffed) {
     setFaceColor(0, MAGENTA);
+    // continue to let everyone know we are buff, like muscle beach buff.
   }
 }
 
 void playerDisplay() {
   setColor(OFF);
+
   FOREACH_FACE(f) {
     //PlayerHealth is displayed on the left side using faces 0-2
     if (f < health) {
@@ -507,17 +564,99 @@ void playerDisplay() {
       setFaceColor(5 - f, ORANGE);
     }
   }
-  if (isAttackMode(mode)) {
-    // flash white
-    if ((millis() / 500) % 2 == 0) {
-      setFaceColor(0, WHITE);
+
+  // animate a growth in healing
+  if (!healAniTimer.isExpired()) {
+    // then we just got healed
+    long progress = healAniTimer.getRemaining();
+    long t0 = HEAL_TRANSFER_DURATION / 4;
+    long t1 = 0;
+    byte brightness = map_m(progress, t0, t1, 0, 255);
+    if ( progress > t0 ) brightness = 0;
+    if ( progress < t1 ) brightness = 255;
+    setFaceColor(health - 1, dim(GREEN, brightness));
+  }
+  // animate a growth in attack
+  if (!stockpileAniTimer.isExpired()) {
+    // then we just got healed
+    long progress = stockpileAniTimer.getRemaining();
+    long t0 = STOCKPILE_TRANSFER_DURATION / 4;
+    long t1 = 0;
+    byte brightness = map_m(progress, t0, t1, 0, 255);
+    if ( progress > t0 ) brightness = 0;
+    if ( progress < t1 ) brightness = 255;
+    setFaceColor(5 - attack + 1, dim(ORANGE, brightness));
+  }
+
+  // animate an attack to the side it is attacking (rows of 2 LEDs in a flash bulb animation)
+  if (mode == STANDBY) {
+    if (!attackAniTimer.isExpired()) {
+      // then we are healing
+      // 4 containers to remove energy from
+      FOREACH_FACE(f) {
+        long offset = ATTACK_DURATION / 6;
+        byte dist = (actionFace + 6 - f) % 6;
+        byte phase;
+        switch (dist) {
+          case 0: phase = 3; break;
+          case 1: phase = 2; break;
+          case 2: phase = 1; break;
+          case 3: phase = 0; break;
+          case 4: phase = 1; break;
+          case 5: phase = 2; break;
+        }
+        long t0 = (phase * offset) + (ATTACK_DURATION - (offset * 3));
+        long t1 = (phase * offset);
+        long progress = attackAniTimer.getRemaining();
+        byte brightness = map_m(progress, t0, t1, 255, 0);
+        if (progress > t0) brightness = 0;
+        if (progress < t1) brightness = 0;
+        setFaceColor(f, dim(ORANGE, brightness));
+      }
     }
   }
 
+  // animate waiting in attack mode circling around with amount of attack
+  if (isAttackMode(mode)) {
+    // circle around with a trail for each attack level
+    // 1 with trail for attack 1
+    // 2 with trails on opposite sides for attack 2
+    // 3 with trails for attack 3
+    long rotation = (millis() / 3) % 360;
+    byte head = rotation / 60;
+    byte brightness;
+
+    FOREACH_FACE(f) {
+
+      byte distFromHead = (6 + head - f) % 6; // returns # of positions away from the head
+      long degFromHead = (360 + rotation - 60 * f) % 360; // returns degrees away from the head
+
+      if (attack == 2) {
+        if (distFromHead >= 3) {
+          distFromHead -= 3;
+          degFromHead -= 180;
+        }
+      }
+      else if (attack == 3) {
+        while (distFromHead >= 2) {
+          distFromHead -= 2;
+          degFromHead -= 120;
+        }
+      }
+      if (distFromHead < (4 - attack)) {
+        brightness = map_m(degFromHead, 0, 60 * (4 - attack), 255, 0); // scale the brightness to 8 bits and dimmer based on distance from head
+      } else {
+        brightness = 0; // don't show past the tail of the snake
+      }
+      setFaceColor(f, dim(ORANGE, brightness));
+    }
+  }
+
+  // animate a defeated player (maybe looks like a boxer seeing stars...)
   if (mode == DEAD) {
     // flash blue and green
     if ((millis() / 500) % 2 == 0) {
-      setColor(dim(BLUE, 127));
+      setColor(dim(ORANGE, 127));
     }
     else {
       setColor(dim(GREEN, 127));
@@ -527,14 +666,113 @@ void playerDisplay() {
 
 void runeDisplay() {
   if (mode == HEAL) {
+    // animate to show we are ready to heal
     setColor(GREEN);
   }
   else if (mode == STOCKPILE) {
+    // animate to show we are going to stockpile
     setColor(ORANGE);
   }
   else {  // STANDBY
-    setColor(dim(WHITE, 127));
-  }
 
+    if (!runeReturnTimer.isExpired()) {
+      // fade up to white from off
+      long t0 = RUNE_RETURN_DURATION / 2;
+      long t1 = 0;
+      long progress = runeReturnTimer.getRemaining();
+      byte brightness = map_m(progress, t0, t1, 0, 127);
+      if (progress > t0) brightness = 0;  // hold dark for a bit then return
+      setColor(dim(WHITE, brightness));
+    }
+    else {
+      setColor(dim(WHITE, 127));
+    }
+
+    // check if we just stockpiled
+    // start an animation for stockpiling
+    // we should also know to which side
+    if (!stockpileAniTimer.isExpired()) {
+      // then we are healing
+      // 4 containers to remove energy from
+      FOREACH_FACE(f) {
+        long offset = STOCKPILE_TRANSFER_DURATION  / 6;
+        byte dist = (actionFace + 6 - f) % 6;
+        byte phase;
+        switch (dist) {
+          case 0: phase = 0; break;
+          case 1: phase = 1; break;
+          case 2: phase = 2; break;
+          case 3: phase = 3; break;
+          case 4: phase = 2; break;
+          case 5: phase = 1; break;
+        }
+        long t0 = (phase * offset) + (STOCKPILE_TRANSFER_DURATION - (offset * 3));
+        long t1 = (phase * offset);
+        long progress = stockpileAniTimer.getRemaining();
+        byte brightness = map_m(progress, t0, t1, 255, 0);
+        if (progress > t0) brightness = 255;
+        if (progress < t1) brightness = 0;
+        setFaceColor(f, dim(ORANGE, brightness));
+      }
+
+      runeReturnTimer.set(RUNE_RETURN_DURATION);  // keep this loaded until we are done
+    }
+
+    // check if we just healed
+    // start an animation for healing
+    // we should also know to which side
+    // animate a growth in healing
+    if (!healAniTimer.isExpired()) {
+      // then we are healing
+      // 4 containers to remove energy from
+      FOREACH_FACE(f) {
+        long offset = HEAL_TRANSFER_DURATION / 6;
+        byte dist = (actionFace + 6 - f) % 6;
+        byte phase;
+        switch (dist) {
+          case 0: phase = 0; break;
+          case 1: phase = 1; break;
+          case 2: phase = 2; break;
+          case 3: phase = 3; break;
+          case 4: phase = 2; break;
+          case 5: phase = 1; break;
+        }
+        long t0 = (phase * offset) + (HEAL_TRANSFER_DURATION - (offset * 3));
+        long t1 = (phase * offset);
+        long progress = healAniTimer.getRemaining();
+        byte brightness = map_m(progress, t0, t1, 255, 0);
+        if (progress > t0) brightness = 255;
+        if (progress < t1) brightness = 0;
+        setFaceColor(f, dim(GREEN, brightness));
+      }
+
+      runeReturnTimer.set(RUNE_RETURN_DURATION);  // keep this loaded until we are done
+    }
+  }
+}
+
+/*
+   -------------------------------------------------------------------------------------
+                                 HELPER FUNCTIONS
+   -------------------------------------------------------------------------------------
+*/
+
+/*
+  This map() functuion is now in Arduino.h in /dev
+  It is replicated here so this skect can compile on older API commits
+*/
+
+long map_m(long x, long in_min, long in_max, long out_min, long out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+/*
+   Sin in degrees ( standard sin() takes radians )
+*/
+
+float sin_d( uint16_t degrees ) {
+
+  return sin( ( degrees / 360.0F ) * 2.0F * PI   );
 }
 
