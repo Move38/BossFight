@@ -38,7 +38,7 @@ ServicePortSerial Serial;     // HELP US! We need some sign of life... or at lea
 
 #define BOSS_PROB_HEAL       1      //  ratio for bossFight option
 #define BOSS_PROB_FIGHT      1      //
-#define BOSS_BUFFED          1      // Make the boss do +1 more damage 
+#define BOSS_BUFFED_BOOST    1      // Make the boss do +1 more damage 
 
 #define PLAYER_ATTACK_TIMEOUT  4000 // apparently we didn't want to fight in the first place
 Timer attackTimer;
@@ -354,9 +354,9 @@ void playerMode() {
         // TODO: handle the boss hitting us
         else if (neighborPiece == BOSS && isAttackMode(neighborMode)) {
           if (neighborMode == ATTACK1) {
-            injuryValue = attack;
+            injuryValue = attack;         // we get hit with our own arsenal
           } else if (neighborMode == ATTACKBUFF) {
-            injuryValue = attack + 1;
+            injuryValue = attack + BOSS_BUFFED_BOOST; // we get hit with our own arsenal... and then some
           }
           mode = INJURED;
         }
