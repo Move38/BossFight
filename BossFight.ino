@@ -30,7 +30,7 @@ ServicePortSerial Serial;     // HELP US! We need some sign of life... or at lea
 
 
 #define BOSS_MAX_HEALTH      6      //
-#define BOSS_START_HEALTH    3      //
+#define BOSS_START_HEALTH    2      //
 #define PLAYER_MAX_HEALTH    3      //
 #define PLAYER_START_HEALTH  1      // 
 #define PLAYER_MAX_ATTACK    3      // the apprentice becomes the master
@@ -232,10 +232,12 @@ void bossMode() {
         mode = ATTACK1;
       } else if (diceRoll > BOSS_PROB_HEAL && bossBuffed == true) {
         mode = ATTACKBUFF;
+        bossBuffed = false;
       }
       else {
         // DRINK SOME TEA AND REST UP
         mode = HEALED;
+        bossBuffed = false;
       }
     }
     else {
